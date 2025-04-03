@@ -1,0 +1,139 @@
+\documentclass{article}
+\usepackage{amsmath, amssymb, graphicx}
+\usepackage{hyperref}
+
+\title{\texttt{QMC\_sampler} -- A Quasi Monte Carlo Sampling Library}
+\author{Documentation}
+\date{\today}
+
+\begin{document}
+
+\maketitle
+
+\section{Introduction}
+This document provides an overview of the \texttt{QMC\_sampler} Python library, which generates Quasi Monte Carlo (QMC) point sets from a high-dimensional generating vector. These points are used in Multilevel Monte Carlo (MLMC) simulations, particularly for solving McKean-Vlasov type Stochastic Differential Equations (SDEs) like the Kuramoto oscillator model.
+
+\section{The Kuramoto Oscillator McKean-Vlasov SDE}
+The Kuramoto model describes a system of coupled oscillators, where each oscillator's phase evolves according to an SDE incorporating mean-field interactions. The McKean-Vlasov formulation extends the classical Kuramoto model by including stochastic perturbations. The governing equation is given by:
+\begin{equation}
+    dX_t^i = \nu^i dt + \frac{K}{P} \sum_{j=1}^{P} \sin(X_t^j - X_t^i) dt + \sigma dW_t^i, \quad i = 1, \dots, P,
+\end{equation}
+where:
+\begin{itemize}
+    \item $X_t^i$ is the phase of the $i$-th oscillator at time $t$.
+    \item $\nu^i$ is the  frequency of the $i$-th oscillator.
+    \item $K$ is the coupling strength between oscillators.
+    \item $\sigma$ is the noise intensity.
+    \item $W_t^i$ is a Wiener process modeling stochastic fluctuations.
+\end{itemize}
+This SDE is simulated numerically using Euler-Maruyama and Richardson extrapolation methods described in later sections.
+
+\section{Class \texttt{QMC\_sampler}}
+
+The \texttt{QMC\_sampler} class manages QMC point sets generated from a predefined high-dimensional generating vector. This vector is typically loaded from a file and used to generate lattice rule points for simulations. It supports hierarchical sampling through an adaptive level structure and ensures efficient low-discrepancy point generation. 
+
+\subsection{Attributes}
+\begin{itemize}
+    \item \texttt{points} (list of numpy arrays): Stores generated QMC points at different levels. Each entry is a matrix of shape $(2^{\text{level}}, d)$ where $d$ varies per level.
+    \item \texttt{max\_level} (int): The current maximum refinement level.
+    \item \texttt{generating\_vector} (numpy array of shape $(d,)$): Stores the initial high-dimensional generating vector loaded from a file.
+    \item \texttt{gen\_vecs} (list of numpy arrays): Stores the history of constructed generating vectors for different levels.
+\end{itemize}
+
+\subsection{Methods}
+
+\subsubsection{\texttt{initialize\_from\_file(filename)}}
+\begin{itemize}
+    \item Reads a file containing a generating vector.
+    \item The file should contain two columns: the dimension index and the corresponding vector component.
+    \item Sorts the data by the dimension index and stores the generating vector.
+    \item Resets the \texttt{max\_level} attribute to zero.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{filename} (str): Path to the input file.
+    \end{itemize}
+\end{itemize}
+
+\subsubsection{\texttt{add\_level()}}
+\begin{itemize}
+    \item Extracts a subvector from the generating vector and generates new QMC lattice rule points.
+    \item Updates the list of points and increments the \texttt{max\_level} counter.
+\end{itemize}
+
+\section{Function Reference}
+
+\subsection{\texttt{bridge\_map(point, t, T)}}
+\begin{itemize}
+    \item Implements Brownian bridge construction.
+    \item Uses midpoint recursion to generate Wiener process paths.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{point} (numpy array of shape $(M, P)$): Input QMC points.
+        \item \texttt{t} (float): Initial time.
+        \item \texttt{T} (float): Final time.
+    \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{pts\_to\_paths(pts, shifts, T, incr=True)}}
+\begin{itemize}
+    \item Maps QMC points to Wiener paths and model parameters for Kuramoto oscillators.
+    \item Computes a probability measure transform based on Gaussian quantiles.
+    \item Applies the \texttt{bridge\_map} function for path generation.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{pts} (numpy array of shape $(M, d)$): Input QMC points.
+        \item \texttt{shifts} (numpy array of shape $(m, d)$): Shift vectors for each level.
+        \item \texttt{T} (float): Final time for simulation.
+        \item \texttt{incr} (bool, default=True): Whether to compute increments or absolute paths.
+    \end{itemize}
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{p\_measure\_pts} (numpy array of shape $(M, d)$): Transformed QMC points representing Wiener paths and parameters.
+    \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{euler\_maruyama\_kuramoto(X0, nu, dW, T, P, sigma)}}
+\begin{itemize}
+    \item Implements the Euler-Maruyama discretization for the McKean-Vlasov Kuramoto system.
+    \item Simulates the Kuramoto oscillator system with stochastic perturbations and mean-field interactions.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{X0} (numpy array of shape $(M, P)$): Initial phase angles of the oscillators for $M$ samples of $P$ oscillators.
+        \item \texttt{nu} (numpy array of shape $(M, P)$):  frequencies for the $M$ samples of $P$ oscillators.
+        \item \texttt{dW} (numpy array of shape $(M, P, N)$): Wiener increments for the $M$ samples over $N$ time steps.
+        \item \texttt{T} (float): Final time of the simulation.
+        \item \texttt{P} (int): Number of oscillators (particles).
+        \item \texttt{sigma} (float): Noise intensity.
+    \end{itemize}
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{X\_T} (numpy array of shape $(M, P)$): Final phase angles at time $T$ for each sample.
+    \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{richardson\_euler\_maruyama\_kuramoto(X0, nu, dW, T, P, sigma)}}
+\begin{itemize}
+    \item Computes a Richardson extrapolated version of the Euler-Maruyama method for the McKean-Vlasov Kuramoto system.
+    \item Uses fine and coarse discretizations to improve the accuracy of the simulation.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{X0} (numpy array of shape $(M, P)$): Initial phase angles of the oscillators for $M$ samples of $P$ oscillators.
+        \item \texttt{nu} (numpy array of shape $(M, P)$):  frequencies for the $M$ samples of $P$ oscillators.
+        \item \texttt{dW} (numpy array of shape $(M, P, N)$): Wiener increments for the $M$ samples over $N$ time steps.
+        \item \texttt{T} (float): Final time of the simulation.
+        \item \texttt{P} (int): Number of oscillators (particles).
+        \item \texttt{sigma} (float): Noise intensity.
+    \end{itemize}
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{X\_T} (float): Richardson-extrapolated final phase angle at time $T$.
+    \end{itemize}
+\end{itemize}
+
+\end{document}
+
+
+
+
+
+

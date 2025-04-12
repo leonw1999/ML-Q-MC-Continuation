@@ -30,34 +30,41 @@ This SDE is simulated numerically using Euler-Maruyama and Richardson extrapolat
 
 \section{Class \texttt{QMC\_sampler}}
 
-The \texttt{QMC\_sampler} class manages QMC point sets generated from a predefined high-dimensional generating vector. This vector is typically loaded from a file and used to generate lattice rule points for simulations. It supports hierarchical sampling through an adaptive level structure and ensures efficient low-discrepancy point generation. 
+The \texttt{QMC\_sampler} class constructs hierarchical quasi-Monte Carlo (QMC) point sets using lattice rules from a high-dimensional generating vector. It is designed for use in multilevel algorithms that require recursive refinement of both the number of samples and the discretization level in time. The class supports dynamic level construction by mixing previously used vectors with new components from the global generating vector.
 
 \subsection{Attributes}
 \begin{itemize}
-    \item \texttt{points} (list of numpy arrays): Stores generated QMC points at different levels. Each entry is a matrix of shape $(2^{\text{level}}, d)$ where $d$ varies per level.
-    \item \texttt{max\_level} (int): The current maximum refinement level.
-    \item \texttt{generating\_vector} (numpy array of shape $(d,)$): Stores the initial high-dimensional generating vector loaded from a file.
-    \item \texttt{gen\_vecs} (list of numpy arrays): Stores the history of constructed generating vectors for different levels.
+    \item \texttt{p0} (int): Base-$2$ logarithm of the number of samples on the coarsest level.
+    \item \texttt{n0} (int): Base-$2$ logarithm of the number of time steps on the coarsest level.
+    \item \texttt{points} (list of numpy arrays): Stores generated QMC point sets at each level. Each matrix is of shape $(2^{\texttt{max\_level}} \cdot 2^{\texttt{p0}}, d)$ where $d$ varies with level.
+    \item \texttt{max\_level} (int): Current refinement level; incremented with each call to \texttt{add\_level()}.
+    \item \texttt{generating\_vector} (numpy array): High-dimensional vector loaded from file; provides components for constructing level-specific vectors.
+    \item \texttt{gen\_vecs} (list of numpy arrays): Stores the generating vectors used to construct the QMC point sets at each level.
 \end{itemize}
 
 \subsection{Methods}
 
 \subsubsection{\texttt{initialize\_from\_file(filename)}}
 \begin{itemize}
-    \item Reads a file containing a generating vector.
-    \item The file should contain two columns: the dimension index and the corresponding vector component.
-    \item Sorts the data by the dimension index and stores the generating vector.
-    \item Resets the \texttt{max\_level} attribute to zero.
+    \item Loads the global generating vector from a text file with two columns: a dimension index and its corresponding value.
+    \item Sorts entries by index and stores only the values as the \texttt{generating\_vector}.
+    \item Resets \texttt{max\_level} to 0 and leaves \texttt{points} empty.
     \item \textbf{Arguments:}
     \begin{itemize}
-        \item \texttt{filename} (str): Path to the input file.
+        \item \texttt{filename} (str): Path to the generating vector file.
     \end{itemize}
 \end{itemize}
 
 \subsubsection{\texttt{add\_level()}}
 \begin{itemize}
-    \item Extracts a subvector from the generating vector and generates new QMC lattice rule points.
-    \item Updates the list of points and increments the \texttt{max\_level} counter.
+    \item Constructs a new generating vector for the current level using a recursive mixing scheme:
+    \begin{itemize}
+        \item On level 0: selects the first $2 + 2^{\texttt{n0}}$ components of the global generating vector.
+        \item On higher levels: mixes new components from the global generating vector with the previous level’s vector, alternating entries to retain low-discrepancy properties.
+    \end{itemize}
+    \item Computes a QMC lattice point set of size $2^{\texttt{max\_level}} \cdot 2^{\texttt{p0}}$ using the most recent vector.
+    \item Stores both the generating vector and the corresponding point set.
+    \item Increments \texttt{max\_level}.
 \end{itemize}
 
 \section{Function Reference}
@@ -92,43 +99,147 @@ The \texttt{QMC\_sampler} class manages QMC point sets generated from a predefin
     \end{itemize}
 \end{itemize}
 
-\subsection{\texttt{euler\_maruyama\_kuramoto(X0, nu, dW, T, P, sigma)}}
+\subsection{\texttt{euler\_maruyama\_kuramoto(M\_matrix, T, K, sigma, P)}}
 \begin{itemize}
-    \item Implements the Euler-Maruyama discretization for the McKean-Vlasov Kuramoto system.
-    \item Simulates the Kuramoto oscillator system with stochastic perturbations and mean-field interactions.
+    \item Implements the Euler-Maruyama discretization for the McKean-Vlasov Kuramoto model.
+    \item Simulates the evolution of interacting oscillators with stochastic perturbations and mean-field coupling, using consolidated input data in a flattened matrix format.
+    
     \item \textbf{Arguments:}
     \begin{itemize}
-        \item \texttt{X0} (numpy array of shape $(M, P)$): Initial phase angles of the oscillators for $M$ samples of $P$ oscillators.
-        \item \texttt{nu} (numpy array of shape $(M, P)$):  frequencies for the $M$ samples of $P$ oscillators.
-        \item \texttt{dW} (numpy array of shape $(M, P, N)$): Wiener increments for the $M$ samples over $N$ time steps.
-        \item \texttt{T} (float): Final time of the simulation.
-        \item \texttt{P} (int): Number of oscillators (particles).
-        \item \texttt{sigma} (float): Noise intensity.
+        \item \texttt{M\_matrix} (numpy array of shape $(M \cdot P, 2 + N)$): Input matrix containing simulation data for $M$ samples, each with $P$ oscillators, over $N$ time steps.
+        \begin{itemize}
+            \item Column 0: Initial phase angles (flattened).
+            \item Column 1: Natural frequencies (flattened).
+            \item Columns 2 to $N+1$: Wiener path increments (flattened).
+        \end{itemize}
+        \item \texttt{T} (float): Final simulation time.
+        \item \texttt{K} (float): Coupling strength between oscillators.
+        \item \texttt{sigma} (float): Noise intensity of the stochastic perturbation.
+        \item \texttt{P} (int): Number of oscillators per sample.
     \end{itemize}
+    
     \item \textbf{Returns:}
     \begin{itemize}
-        \item \texttt{X\_T} (numpy array of shape $(M, P)$): Final phase angles at time $T$ for each sample.
+        \item \texttt{X} (numpy array of shape $(M, P)$): Final phase angles of the oscillators at time $T$ for all $M$ samples.
+    \end{itemize}
+    
+    \item \textbf{Notes:}
+    \begin{itemize}
+        \item Internally reshapes \texttt{M\_matrix} to separate initial conditions, natural frequencies, and noise realizations.
+        \item Computes the mean-field interaction as the average of sine phase differences at each time step.
+        \item Updates oscillator states using a time-stepping scheme that includes deterministic and stochastic contributions.
     \end{itemize}
 \end{itemize}
 
-\subsection{\texttt{richardson\_euler\_maruyama\_kuramoto(X0, nu, dW, T, P, sigma)}}
+\subsection{\texttt{obj\_fctn(x, P)}}
 \begin{itemize}
-    \item Computes a Richardson extrapolated version of the Euler-Maruyama method for the McKean-Vlasov Kuramoto system.
-    \item Uses fine and coarse discretizations to improve the accuracy of the simulation.
+    \item Evaluates the observable function for the output of the Kuramoto simulation.
+    \item Applies a nonlinear transformation (here, the Gaussian function $e^{-x^2}$) to each oscillator phase, then averages over oscillators within each sample.
+    
     \item \textbf{Arguments:}
     \begin{itemize}
-        \item \texttt{X0} (numpy array of shape $(M, P)$): Initial phase angles of the oscillators for $M$ samples of $P$ oscillators.
-        \item \texttt{nu} (numpy array of shape $(M, P)$):  frequencies for the $M$ samples of $P$ oscillators.
-        \item \texttt{dW} (numpy array of shape $(M, P, N)$): Wiener increments for the $M$ samples over $N$ time steps.
+        \item \texttt{x} (numpy array of shape $(M \cdot P,)$ or $(M, P)$): A flattened or reshaped array containing the final phase values from the simulation, where $M$ is the number of samples and $P$ is the number of oscillators per sample.
+        \item \texttt{P} (int): Number of oscillators per sample.
+    \end{itemize}
+    
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{obs} (numpy array of shape $(M,)$): Observable values computed as the mean of $e^{-x^2}$ over the $P$ oscillators, for each of the $M$ samples.
+    \end{itemize}
+    
+    \item \textbf{Notes:}
+    \begin{itemize}
+        \item The input vector is reshaped to shape $(M, P)$ if provided as a flat array.
+        \item This function is typically used to post-process simulation outputs into scalar values per sample for further statistical evaluation (e.g., mean, variance).
+        \item The Gaussian transformation $e^{-x^2}$ serves as a smooth observable that decays for large phase values.
+    \end{itemize}
+\end{itemize}
+
+
+\subsection{\texttt{richardson\_euler\_maruyama\_kuramoto(M\_fine, T, K, sigma, P)}}
+\begin{itemize}
+    \item Computes a Richardson-extrapolated estimate of the observable for the McKean-Vlasov Kuramoto system using the Euler-Maruyama method.
+    \item Applies the Euler-Maruyama method at two resolutions (fine and coarse), evaluates the observable function, and combines the results to improve the accuracy via Richardson extrapolation.
+
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{M\_fine} (numpy array of shape $(M \cdot P, 2 + N)$): Input matrix for the fine discretization containing initial conditions, natural frequencies, and fine-resolution Wiener increments.
         \item \texttt{T} (float): Final time of the simulation.
-        \item \texttt{P} (int): Number of oscillators (particles).
-        \item \texttt{sigma} (float): Noise intensity.
+        \item \texttt{K} (float): Coupling strength in the Kuramoto system.
+        \item \texttt{sigma} (float): Noise intensity of the stochastic perturbation.
+        \item \texttt{P} (int): Number of oscillators per sample.
+    \end{itemize}
+
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{X\_rich} (numpy array of shape $(M,)$): Richardson-extrapolated observable values for each of the $M$ samples.
+    \end{itemize}
+
+    \item \textbf{Notes:}
+    \begin{itemize}
+        \item Internally constructs the coarse-resolution input matrix by subsampling the fine input via the helper function \texttt{cut\_incr}.
+        \item The observable is evaluated after each Euler-Maruyama integration using the \texttt{obj\_fctn} function.
+        \item Richardson extrapolation is computed as $2 \cdot \texttt{X\_fine} - \texttt{X\_coarse}$ to cancel leading-order bias in the time discretization.
+        \item This method increases accuracy without significantly increasing computational cost.
+    \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{cut\_incr(M)}}
+\begin{itemize}
+    \item Constructs a coarser-resolution input matrix by aggregating adjacent columns of time increments from a fine-resolution matrix.
+    \item Used to reduce the time resolution (e.g., halving the number of time steps) while preserving the same initial conditions and frequencies.
+
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{M} (numpy array of shape $(M \cdot P, 2 + N)$): Input matrix with each row representing a single oscillator and containing:
+        \begin{itemize}
+            \item Column 0: initial phase angle
+            \item Column 1: natural frequency
+            \item Columns 2 onward: fine-resolution Wiener increments (must be even in number)
+        \end{itemize}
+    \end{itemize}
+
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{M\_coarse} (numpy array of shape $(M \cdot P, 2 + N/2)$): Coarsened matrix with the same first two columns and paired sums of every two adjacent Wiener increments starting from column 2.
+    \end{itemize}
+
+    \item \textbf{Notes:}
+    \begin{itemize}
+        \item Raises an error if the input does not have at least two columns or if the number of columns from index 2 onward is not even.
+        \item Ensures compatibility with the Richardson extrapolation routine by aligning coarse and fine time resolutions.
+    \end{itemize}
+\end{itemize}
+
+\subsection{\texttt{cut\_paths(M)}}
+\begin{itemize}
+    \item Removes every other row starting from the third row (i.e., rows with 0-based indices 2, 4, 6, \dots) from the input matrix.
+    \item Typically used to reduce the number of simulation paths or rows in a structured way, preserving even-indexed rows.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{M} (numpy array): A 2D input matrix from which rows will be selectively removed. The matrix can have arbitrary shape and content, as long as it has at least 3 rows to apply the row-cutting logic.
     \end{itemize}
     \item \textbf{Returns:}
     \begin{itemize}
-        \item \texttt{X\_T} (float): Richardson-extrapolated final phase angle at time $T$.
+        \item \texttt{M\_cut} (numpy array): A matrix with the rows at indices 2, 4, 6, \dots removed, preserving the structure of the remaining data.
     \end{itemize}
 \end{itemize}
+
+\subsection{\texttt{cut\_pts(M)}}
+\begin{itemize}
+    \item Splits the input matrix \texttt{M} into two submatrices by alternating rows.
+    \item \textbf{Arguments:}
+    \begin{itemize}
+        \item \texttt{M} (numpy array): A 2D input matrix of arbitrary shape. Must contain at least one row.
+    \end{itemize}
+    \item \textbf{Returns:}
+    \begin{itemize}
+        \item \texttt{M1} (numpy array): Submatrix consisting of the even-indexed rows of \texttt{M} (rows 0, 2, 4, \dots).
+        \item \texttt{M2} (numpy array): Submatrix consisting of the odd-indexed rows of \texttt{M} (rows 1, 3, 5, \dots).
+    \end{itemize}
+\end{itemize}
+
+
 
 \end{document}
 

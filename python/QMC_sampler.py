@@ -1,7 +1,9 @@
 import numpy as np
 
 class QMC_sampler:
-    def __init__(self):
+    def __init__(self, p0=0, n0=0):
+        self.p0 = p0 # 2-logarithm of number of points at level 0
+        self.n0 = n0 # 2-logarithm of number of time steps at level 0
         self.points = []  # List of vectors (initially empty)
         self.max_level = 0  # Positive integer
         self.generating_vector = None  # Stores the first vector
@@ -44,27 +46,30 @@ class QMC_sampler:
         Appends this matrix to points.
         """
         if self.max_level == 0 and self.generating_vector is not None and len(self.generating_vector) >= 3:
-            new_vector = self.generating_vector[:3]
-            self.points.append(new_vector)
+            new_vector = self.generating_vector[:2 + 2**self.n0]
             self.gen_vecs.append(new_vector)
+            size = (2 ** self.max_level) * (2 ** self.p0)
+            v = self.gen_vecs[-1]
+            indices = np.arange(size).reshape(-1, 1)
+            matrix = (indices * v / size) % 1
+            self.points.append(matrix)
             self.max_level += 1
         else:
-            size = 2 ** self.max_level
-            dim = 2 + size
             
             # First two components remain the same
             new_vector = self.generating_vector[:2].tolist()
             
             # Define subvector from generating_vector
-            start_idx = 2 + 2 ** (self.max_level - 1)
-            end_idx = 2 + 2 ** self.max_level
+            start_idx = 2 + (2 ** self.n0) * (2 ** (self.max_level - 1))
+            end_idx = 2 + (2 ** self.n0) * (2 ** self.max_level)
             subvector = self.generating_vector[start_idx:end_idx]
-            
+
             # Get the last vector in gen_vecs
             last_vector = self.gen_vecs[-1][2:]
             
             # Mix the subvector and last_vector alternatingly using slicing
             mixed_vector = np.empty(len(subvector) + len(last_vector))
+        
             mixed_vector[0::2] = subvector
             mixed_vector[1::2] = last_vector
 
@@ -75,7 +80,7 @@ class QMC_sampler:
             self.gen_vecs.append(np.array(new_vector))
 
             # Generate lattice points
-            size = 2 ** self.max_level
+            size = (2 ** self.max_level) * (2 ** self.p0)
             v = self.gen_vecs[-1]
             indices = np.arange(size).reshape(-1, 1)
             matrix = (indices * v / size) % 1

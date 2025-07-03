@@ -8,7 +8,7 @@ from cut_incr import cut_incr
 from richardson_euler_maruyama_kuramoto import richardson_euler_maruyama_kuramoto
 from obj_fctn import obj_fctn
 
-plt.rcParams.update({'font.size': 11})
+[plt].rcParams.update({'font.size': 11})
 plt.rcParams['lines.linewidth'] = 1.05
 
 # --- Parameters ---
@@ -22,7 +22,7 @@ n0 = 2
 
 # --- Initialize QMC Sampler ---
 sampler = QMC_sampler(p0=p0, n0=n0)
-sampler.initialize_from_file('/Users/wilkoslp/Desktop/Repositories/ML-Q-MC-Continuation/python/genvec.txt')
+sampler.initialize_from_file('genvec.txt')
 for _ in range(max_level):
     sampler.add_level()
 

@@ -9,10 +9,11 @@ def test_qmc_sampler():
     
     # Test initialize_from_file function (replace with an actual path to your file)
     try:
-        qmc_sampler.initialize_from_file('/Users/wilkoslp/Desktop/Repositories/ML-Q-MC-Continuation/python/genvec.txt')
+        qmc_sampler.initialize_from_file('genvec.txt')
         print("QMC Sampler initialized successfully from file.")
         print("Generating vector:", qmc_sampler.generating_vector)
         print("Max level:", qmc_sampler.max_level)
+
     except Exception as e:
         print(f"Error initializing QMC sampler from file: {e}")
     

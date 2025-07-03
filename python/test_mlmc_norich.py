@@ -18,7 +18,7 @@ p0 = 0
 
 # --- Initialize QMC Sampler ---
 sampler = QMC_sampler()
-sampler.initialize_from_file('/Users/wilkoslp/Desktop/Repositories/ML-Q-MC-Continuation/python/genvec.txt')
+sampler.initialize_from_file('genvec.txt')
 for _ in range(9):
     sampler.add_level()
 

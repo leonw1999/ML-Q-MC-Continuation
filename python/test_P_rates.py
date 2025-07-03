@@ -13,7 +13,7 @@ plt.rcParams['lines.linewidth'] = 1.05
 
 # --- Initialize QMC Sampler ---
 sampler = QMC_sampler()
-sampler.initialize_from_file('/Users/wilkoslp/Desktop/Repositories/ML-Q-MC-Continuation/python/genvec.txt')
+sampler.initialize_from_file('genvec.txt')
 for _ in range(7):
     sampler.add_level()
 

@@ -26,7 +26,7 @@ def main():
 
     # Initialize QMC sampler and generate points
     qmc_sampler = QMC_sampler()
-    qmc_sampler.initialize_from_file('/Users/wilkoslp/Desktop/Repositories/ML-Q-MC-Continuation/python/genvec.txt') 
+    qmc_sampler.initialize_from_file('genvec.txt')
 
     # Generate a list to store residuals for each level
     residuals = []

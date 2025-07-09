@@ -20,7 +20,7 @@ def addExtraArguments(parser):
     parser.add_argument("-mlmc_rich", default=False,
                         action="store_true",
                         help="Use Richardson extrapolating")
-    parser.add_argument("-mlmc_antithetic", default=False,
+    parser.add_argument("-mlmc_no_antithetic", default=False,
                         action="store_true",
                         help="Use Richardson extrapolating")
     parser.add_argument("-sde_T", default=1., action="store",
@@ -68,12 +68,12 @@ def mySampleQoI(run, inds, M):
         if run.params.mlmc_rich:
             x2 = richardson_euler_maruyama_kuramoto(M2, T, K, sigma, P2)
             x3 = x2
-            if run.params.mlmc_antithetic:
+            if not run.params.mlmc_no_antithetic:
                 x3 = richardson_euler_maruyama_kuramoto(M3, T, K, sigma, P3)
         else:
             x2 = obj_fctn(euler_maruyama_kuramoto(M2, T, K, sigma, P2), P2)
             x3 = x2
-            if run.params.mlmc_antithetic:
+            if not run.params.mlmc_no_antithetic:
                 x3 = obj_fctn(euler_maruyama_kuramoto(M3, T, K, sigma, P3), P3)
 
         solves[:, 1] = 0.5 * (x2 + x3)

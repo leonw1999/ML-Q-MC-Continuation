@@ -68,12 +68,12 @@ def mySampleQoI(run, inds, M):
         if run.params.mlmc_rich:
             x2 = richardson_euler_maruyama_kuramoto(M2, T, K, sigma, P2)
             x3 = x2
-            if runs.params.mlmc_antithetic:
+            if run.params.mlmc_antithetic:
                 x3 = richardson_euler_maruyama_kuramoto(M3, T, K, sigma, P3)
         else:
             x2 = obj_fctn(euler_maruyama_kuramoto(M2, T, K, sigma, P2), P2)
             x3 = x2
-            if runs.params.mlmc_antithetic:
+            if run.params.mlmc_antithetic:
                 x3 = obj_fctn(euler_maruyama_kuramoto(M3, T, K, sigma, P3), P3)
 
         solves[:, 1] = 0.5 * (x2 + x3)
